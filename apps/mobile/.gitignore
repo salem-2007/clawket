@@ -54,3 +54,5 @@ modules/*/ios/build/
 
 # Strategy docs (private, not tracked)
 strategy/
+.env.local
+certs/

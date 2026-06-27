@@ -1,0 +1,61 @@
+name: Build iOS Unsigned IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: .
+
+      - name: Generate iOS project
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        run: cd ios && pod install --repo-update
+
+      - name: Build unsigned archive
+        run: |
+          xcodebuild archive \
+            -workspace ios/Clawket.xcworkspace \
+            -scheme Clawket \
+            -configuration Release \
+            -archivePath build/Clawket.xcarchive \
+            -destination "generic/platform=iOS" \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            ENABLE_BITCODE=NO
+
+      - name: Create unsigned IPA
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -R build/Clawket.xcarchive/Products/Applications/*.app build/ipa/Payload/
+          cd build/ipa
+          zip -r ../Clawket-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Clawket-unsigned-ipa
+          path: apps/mobile/build/Clawket-unsigned.ipa
+          retention-days: 30
